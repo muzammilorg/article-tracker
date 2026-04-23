@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 export default function Dashboard() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState('');
   const [date, setDate] = useState('');
   const [authorSearch, setAuthorSearch] = useState('');
   const [siteSearch, setSiteSearch] = useState('');
@@ -15,7 +16,11 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (date) params.append('date', date);
+      if (date) {
+        params.append('date', date);
+      } else if (month) {
+        params.append('month', month);
+      }
       if (authorSearch) params.append('author', authorSearch);
       
       const res = await fetch(`/api/articles?${params.toString()}`);
@@ -54,7 +59,7 @@ export default function Dashboard() {
       fetchData();
     }, 500);
     return () => clearTimeout(timer);
-  }, [date, authorSearch]);
+  }, [month, date, authorSearch]);
 
   const totalGlobalPosts = data.reduce((sum, item) => sum + item.count, 0);
 
@@ -91,8 +96,13 @@ export default function Dashboard() {
   const avgPerSite = sitesTracked > 0 ? Math.round(totalGlobalPosts / sitesTracked) : 0;
   const topSite = sitesTracked > 0 ? domainGroups[0].domain : '-';
 
-  // Helper to format date for display
-  const displayDate = date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Overall';
+  // Helper to format date/month for display
+  const displayPeriod = date 
+    ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : month 
+      ? new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : 'Overall';
+  const periodLabel = date ? 'on' : month ? 'in' : null;
 
   return (
     <div className="min-h-screen bg-[#18181b] p-6 md:p-10 font-sans text-gray-200">
@@ -114,9 +124,23 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto flex-1">
              <div className="relative w-full md:max-w-[240px]">
                 <input 
+                  type="month" 
+                  value={month}
+                  onChange={(e) => {
+                    setMonth(e.target.value);
+                    setDate('');
+                  }}
+                  className="w-full appearance-none bg-[#27272a] border border-[#3f3f46] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-colors font-medium [color-scheme:dark]"
+                />
+             </div>
+             <div className="relative w-full md:max-w-[240px]">
+                <input 
                   type="date" 
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    setMonth('');
+                  }}
                   className="w-full appearance-none bg-[#27272a] border border-[#3f3f46] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-colors font-medium [color-scheme:dark]"
                 />
              </div>
@@ -197,7 +221,7 @@ export default function Dashboard() {
                 <div className="flex flex-col mb-5">
                   <span className="text-[40px] leading-none font-semibold text-white mb-1">{totalCount}</span>
                   <span className="text-[13px] text-gray-400">
-                    articles {date ? `on ${displayDate}` : 'overall'}
+                    articles {periodLabel ? `${periodLabel} ${displayPeriod}` : 'overall'}
                   </span>
                 </div>
                 
