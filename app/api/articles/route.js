@@ -9,16 +9,16 @@ export async function GET(request) {
     await dbConnect();
     
     const { searchParams } = new URL(request.url);
-    const month = searchParams.get('month'); // format: YYYY-MM
+    const date = searchParams.get('date'); // format: YYYY-MM-DD
     const author = searchParams.get('author');
     const domain = searchParams.get('domain');
 
     const matchStage = {};
 
-    if (month) {
-      const startDate = new Date(`${month}-01T00:00:00Z`);
+    if (date) {
+      const startDate = new Date(`${date}T00:00:00Z`);
       const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + 1);
+      endDate.setDate(endDate.getDate() + 1);
       
       matchStage.publishedAt = {
         $gte: startDate,
