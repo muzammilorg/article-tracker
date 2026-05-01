@@ -25,7 +25,7 @@ export async function POST(request) {
     const results = await Promise.allSettled(
       sites.map(async (site) => {
         // Count articles before sync
-        const before = await Article.countDocuments({ domain: site.domain });
+        const before = await Article.countDocuments({ domain: site.domain, deleted: { $ne: true } });
 
         if (site.type === 'rss') {
           await collectRss(site);
@@ -34,7 +34,7 @@ export async function POST(request) {
         }
 
         // Count after sync
-        const after = await Article.countDocuments({ domain: site.domain });
+        const after = await Article.countDocuments({ domain: site.domain, deleted: { $ne: true } });
         const newArticles = after - before;
 
         return { domain: site.domain, newArticles, type: site.type };

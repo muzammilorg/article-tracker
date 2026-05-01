@@ -14,7 +14,7 @@ export async function GET(request) {
     const author = searchParams.get('author');
     const domain = searchParams.get('domain');
 
-    const matchStage = {};
+    const matchStage = { deleted: { $ne: true } }; // Exclude posts deleted from WordPress
 
     if (date) {
       const startDate = new Date(`${date}T00:00:00Z`);

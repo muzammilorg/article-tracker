@@ -22,6 +22,13 @@ const ArticleSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  deleted: {
+    type: Boolean,
+    default: false,
+  },
+  lastCheckedAt: {
+    type: Date,
+  },
 }, { timestamps: true });
 
 export default mongoose.models.Article || mongoose.model('Article', ArticleSchema);
