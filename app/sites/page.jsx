@@ -97,6 +97,49 @@ function Spinner({ className = 'w-4 h-4' }) {
   );
 }
 
+// ── Pricing Form ──────────────────────────────────────────────────
+function PricingForm({ site, onSave }) {
+  const [basePrice, setBasePrice] = useState(site.basePrice || 0);
+  const [primeStarPrice, setPrimeStarPrice] = useState(site.primeStarPrice || 0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    await onSave(site._id, basePrice, primeStarPrice);
+    setIsSaving(false);
+  };
+
+  return (
+    <div className="hidden md:flex items-end gap-3 border-l border-[#3f3f46] pl-6 py-1">
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] text-gray-500 uppercase font-semibold">Base Price</span>
+        <input 
+          type="number" 
+          className="w-20 bg-[#18181b] border border-[#3f3f46] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-gray-400 transition-colors"
+          value={basePrice}
+          onChange={e => setBasePrice(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] text-gray-500 uppercase font-semibold">Prime Star</span>
+        <input 
+          type="number" 
+          className="w-20 bg-[#18181b] border border-[#3f3f46] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-gray-400 transition-colors"
+          value={primeStarPrice}
+          onChange={e => setPrimeStarPrice(e.target.value)}
+        />
+      </div>
+      <button 
+        onClick={handleSave}
+        disabled={isSaving}
+        className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] border border-[#3f3f46] rounded-lg text-xs font-semibold text-gray-300 transition-colors disabled:opacity-50"
+      >
+        {isSaving ? 'Saving...' : 'Save'}
+      </button>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────
 export default function SitesAdmin() {
   const [sites, setSites] = useState([]);
@@ -117,6 +160,8 @@ export default function SitesAdmin() {
   const [articleLinkSelector, setArticleLinkSelector] = useState('a');
   const [authorSelector, setAuthorSelector] = useState('.author');
   const [customFavicon, setCustomFavicon] = useState('');
+  const [basePrice, setBasePrice] = useState('');
+  const [primeStarPrice, setPrimeStarPrice] = useState('');
 
   const fetchSites = async () => {
     try {
@@ -139,6 +184,8 @@ export default function SitesAdmin() {
     try {
       const payload = {
         domain, type, customFavicon,
+        basePrice: Number(basePrice) || 0,
+        primeStarPrice: Number(primeStarPrice) || 0,
         ...(type === 'rss'
           ? { rssUrl }
           : { scrapeConfig: { articleListUrl, articleLinkSelector, authorSelector } }),
@@ -151,6 +198,7 @@ export default function SitesAdmin() {
       const json = await res.json();
       if (json.success) {
         setDomain(''); setRssUrl(''); setArticleListUrl(''); setCustomFavicon('');
+        setBasePrice(''); setPrimeStarPrice('');
         setSubmitStatus({ type: 'success', message: 'Website added successfully!' });
         fetchSites();
         setTimeout(() => setSubmitStatus(null), 3000);
@@ -210,6 +258,20 @@ export default function SitesAdmin() {
       });
       fetchSites();
     } catch (e) { console.error(e); }
+  };
+
+  const handleSavePrices = async (siteId, basePrice, primeStarPrice) => {
+    try {
+      await fetch(`/api/sites/${siteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          basePrice: Number(basePrice) || 0,
+          primeStarPrice: Number(primeStarPrice) || 0 
+        }),
+      });
+      fetchSites();
+    } catch (e) { console.error('Failed to update prices', e); }
   };
 
   const handleSync = async () => {
@@ -290,7 +352,7 @@ export default function SitesAdmin() {
           <h2 className="text-[15px] font-semibold text-white mb-6">Add New Website</h2>
           <form onSubmit={handleAddSite} className="space-y-5">
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
               <Field label="Domain (e.g. example.com)">
                 <input
                   required type="text" value={domain}
@@ -311,6 +373,25 @@ export default function SitesAdmin() {
                     </svg>
                   </div>
                 </div>
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+              <Field label="Base Price">
+                <input
+                  type="number" value={basePrice}
+                  onChange={(e) => setBasePrice(e.target.value)}
+                  placeholder="e.g. 1500"
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Prime Star Price">
+                <input
+                  type="number" value={primeStarPrice}
+                  onChange={(e) => setPrimeStarPrice(e.target.value)}
+                  placeholder="e.g. 1300"
+                  className={inputCls}
+                />
               </Field>
             </div>
 
@@ -418,37 +499,28 @@ export default function SitesAdmin() {
                   </div>
 
                   {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-white">{site.domain}</span>
-                      <Badge color={site.type === 'rss' ? 'orange' : 'purple'}>
-                        {site.type.toUpperCase()}
-                      </Badge>
-                      <Badge color={site.active ? 'green' : 'red'}>
-                        {site.active ? 'ACTIVE' : 'DISABLED'}
-                      </Badge>
+                  <div className="flex-1 min-w-0 flex items-center gap-6">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-white">{site.domain}</span>
+                        <Badge color={site.type === 'rss' ? 'orange' : 'purple'}>
+                          {site.type.toUpperCase()}
+                        </Badge>
+                        <Badge color={site.active ? 'green' : 'red'}>
+                          {site.active ? 'ACTIVE' : 'DISABLED'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">
+                        {site.type === 'rss' ? site.rssUrl : site.scrapeConfig?.articleListUrl}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">
-                      {site.type === 'rss' ? site.rssUrl : site.scrapeConfig?.articleListUrl}
-                    </p>
+
+                    {/* Pricing Inputs */}
+                    <PricingForm site={site} onSave={handleSavePrices} />
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-                    {/* Update Icon */}
-                    <FaviconUpload
-                      compact
-                      onChange={(dataUrl) => handleUpdateFavicon(site._id, { type: 'image/png', _dataUrl: dataUrl }, dataUrl)}
-                    />
-                    {/* compact mode triggers differently – wire directly */}
-                    <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#27272a] border border-[#3f3f46] hover:border-gray-500 text-gray-300 rounded-lg transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Icon
-                      <input type="file" accept="image/*" className="hidden"
-                        onChange={(e) => handleUpdateFavicon(site._id, e.target.files[0])} />
-                    </label>
 
                     {/* Backfill */}
                     {site.type === 'rss' && (

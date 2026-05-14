@@ -22,6 +22,14 @@ const SiteSchema = new mongoose.Schema({
   customFavicon: {
     type: String, // Base64 encoded image
   },
+  basePrice: {
+    type: Number,
+    default: 0,
+  },
+  primeStarPrice: {
+    type: Number,
+    default: 0,
+  },
   active: {
     type: Boolean,
     default: true,

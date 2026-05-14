@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [siteSearch, setSiteSearch] = useState('');
   const [sortOrder, setSortOrder] = useState('most');
   const [allAuthors, setAllAuthors] = useState([]);
+  const [sitesConfig, setSitesConfig] = useState([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -35,7 +36,7 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch unique authors on mount
+  // Fetch unique authors and sites configuration on mount
   useEffect(() => {
     const fetchAuthors = async () => {
       try {
@@ -50,7 +51,21 @@ export default function Dashboard() {
         console.error('Failed to fetch authors', error);
       }
     };
+
+    const fetchSites = async () => {
+      try {
+        const res = await fetch('/api/sites');
+        const json = await res.json();
+        if (json.success) {
+          setSitesConfig(json.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch sites configuration', error);
+      }
+    };
+
     fetchAuthors();
+    fetchSites();
   }, []);
 
   useEffect(() => {
@@ -61,7 +76,30 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, [month, date, authorSearch]);
 
+  const getPricePerPost = (domain, author) => {
+    const teamMembers = [
+      'Jimmy Hopkins', 'Java Fox', 'Mark', 'Dale Brown', 
+      'Micheal Gent', 'John Rick', 'Gimma', 'Garvin Garcia', 
+      'Ashley Jordan', 'admin', 'Jimmy Jhon'
+    ];
+    
+    if (teamMembers.some(name => name.toLowerCase() === author.toLowerCase())) {
+      return 0;
+    }
+    
+    const site = sitesConfig.find(s => s.domain.toLowerCase() === domain.toLowerCase());
+    const isPrimeStar = author.toLowerCase() === 'prime star' || author.toLowerCase() === 'prime star seo';
+    
+    if (site) {
+      if (isPrimeStar && site.primeStarPrice > 0) return site.primeStarPrice;
+      if (site.basePrice > 0) return site.basePrice;
+    }
+    
+    return 0;
+  };
+
   const totalGlobalPosts = data.reduce((sum, item) => sum + item.count, 0);
+  const totalGlobalAmount = data.reduce((sum, item) => sum + (getPricePerPost(item.domain, item.author) * item.count), 0);
 
   const filteredData = useMemo(() => {
     if (!siteSearch) return data;
@@ -80,7 +118,15 @@ export default function Dashboard() {
     // Convert to array for sorting
     const sorted = Object.entries(groups).map(([domain, items]) => {
       const totalCount = items.reduce((sum, item) => sum + item.count, 0);
-      return { domain, items, totalCount };
+      
+      const itemsWithPrice = items.map(item => {
+        const pricePerPost = getPricePerPost(item.domain, item.author);
+        return { ...item, pricePerPost, totalPrice: pricePerPost * item.count };
+      });
+      
+      const totalAmount = itemsWithPrice.reduce((sum, item) => sum + item.totalPrice, 0);
+      
+      return { domain, items: itemsWithPrice, totalCount, totalAmount };
     });
 
     if (sortOrder === 'most') {
@@ -90,7 +136,7 @@ export default function Dashboard() {
     }
 
     return sorted;
-  }, [filteredData, sortOrder]);
+  }, [filteredData, sortOrder, sitesConfig]);
 
   const sitesTracked = Object.keys(domainGroups).length;
   const avgPerSite = sitesTracked > 0 ? Math.round(totalGlobalPosts / sitesTracked) : 0;
@@ -180,6 +226,9 @@ export default function Dashboard() {
           <div className="bg-[#27272a] rounded-xl p-5">
             <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Total Articles</h3>
             <p className="text-3xl font-semibold text-white">{totalGlobalPosts}</p>
+            {totalGlobalAmount > 0 && (
+              <p className="text-sm font-medium text-[#10b981] mt-1">Total: {totalGlobalAmount.toLocaleString()}</p>
+            )}
           </div>
           <div className="bg-[#27272a] rounded-xl p-5">
             <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Avg Per Site</h3>
@@ -214,12 +263,19 @@ export default function Dashboard() {
 
         {/* Content Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-8">
-          {!loading && domainGroups.map(({ domain, items, totalCount }) => (
+          {!loading && domainGroups.map(({ domain, items, totalCount, totalAmount }) => (
             <div key={domain} className="bg-[#27272a] rounded-2xl border border-[#3f3f46] flex flex-col relative overflow-hidden group hover:border-gray-500 transition-colors">
               <div className="p-6 pb-5 flex-1 flex flex-col">
                 <h2 className="text-[15px] font-bold text-white mb-2 truncate">{domain}</h2>
                 <div className="flex flex-col mb-5">
-                  <span className="text-[40px] leading-none font-semibold text-white mb-1">{totalCount}</span>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-[40px] leading-none font-semibold text-white">{totalCount}</span>
+                    {totalAmount > 0 && (
+                      <span className="text-xl font-bold text-[#10b981] bg-[#10b981]/10 px-3 py-1 rounded-lg border border-[#10b981]/20">
+                        {totalAmount.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[13px] text-gray-400">
                     articles {periodLabel ? `${periodLabel} ${displayPeriod}` : 'overall'}
                   </span>
@@ -229,9 +285,16 @@ export default function Dashboard() {
                   {items.map((item, idx) => (
                      <div key={idx} className="flex items-center justify-between py-3 border-t border-[#3f3f46] group-hover:border-gray-600 transition-colors">
                         <span className="text-[14px] font-medium text-gray-300 truncate pr-4">{item.author}</span>
-                        <span className="inline-flex items-center justify-center bg-[#18181b] rounded-full px-2.5 py-0.5 text-[11px] font-bold text-gray-300">
-                          {item.count}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {item.totalPrice > 0 && (
+                            <span className="text-[12px] font-semibold text-[#10b981]">
+                              {item.totalPrice.toLocaleString()}
+                            </span>
+                          )}
+                          <span className="inline-flex items-center justify-center bg-[#18181b] rounded-full px-2.5 py-0.5 text-[11px] font-bold text-gray-300">
+                            {item.count}
+                          </span>
+                        </div>
                      </div>
                   ))}
                   
