@@ -80,7 +80,7 @@ export default function Dashboard() {
     const teamMembers = [
       'Jimmy Hopkins', 'Java Fox', 'Mark', 'Dale Brown', 
       'Micheal Gent', 'John Rick', 'Gimma', 'Garvin Garcia', 
-      'Ashley Jordan', 'admin', 'Jimmy Jhon', 'Ivan'
+      'Ashley Jordan', 'admin', 'Jimmy Jhon', 'Ivan', "Robert Allen"
     ];
     
     if (teamMembers.some(name => name.toLowerCase() === author.toLowerCase())) {
