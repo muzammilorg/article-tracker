@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
+import { formatPakistanDate } from '../../lib/date-time.js';
 
 export default function Dashboard() {
   const [data, setData] = useState([]);
@@ -77,18 +79,14 @@ export default function Dashboard() {
   }, [month, date, authorSearch]);
 
   const getPricePerPost = (domain, author) => {
-    const teamMembers = [
-      'Jimmy Hopkins', 'Java Fox', 'Mark', 'Dale Brown', 
-      'Micheal Gent', 'John Rick', 'Gimma', 'Garvin Garcia', 
-      'Ashley Jordan', 'admin', 'Jimmy Jhon', 'Ivan', "Robert Allen"
-    ];
-    
-    if (teamMembers.some(name => name.toLowerCase() === author.toLowerCase())) {
+    const site = sitesConfig.find(s => s.domain.toLowerCase() === domain.toLowerCase());
+    const normalizedAuthor = author?.trim().toLowerCase();
+
+    if (!normalizedAuthor || site?.admins?.some(name => name.trim().toLowerCase() === normalizedAuthor)) {
       return 0;
     }
-    
-    const site = sitesConfig.find(s => s.domain.toLowerCase() === domain.toLowerCase());
-    const isPrimeStar = author.toLowerCase() === 'prime star' || author.toLowerCase() === 'prime star seo';
+
+    const isPrimeStar = normalizedAuthor === 'prime star' || normalizedAuthor === 'prime star seo';
     
     if (site) {
       if (isPrimeStar && site.primeStarPrice > 0) return site.primeStarPrice;
@@ -97,9 +95,6 @@ export default function Dashboard() {
     
     return 0;
   };
-
-  const totalGlobalPosts = data.reduce((sum, item) => sum + item.count, 0);
-  const totalGlobalAmount = data.reduce((sum, item) => sum + (getPricePerPost(item.domain, item.author) * item.count), 0);
 
   const filteredData = useMemo(() => {
     if (!siteSearch) return data;
@@ -138,21 +133,27 @@ export default function Dashboard() {
     return sorted;
   }, [filteredData, sortOrder, sitesConfig]);
 
-  const sitesTracked = Object.keys(domainGroups).length;
+  const totalGlobalPosts = domainGroups.reduce((sum, site) => sum + site.totalCount, 0);
+  const totalGlobalAmount = domainGroups.reduce((sum, site) => sum + site.totalAmount, 0);
+  const sitesTracked = domainGroups.length;
   const avgPerSite = sitesTracked > 0 ? Math.round(totalGlobalPosts / sitesTracked) : 0;
-  const topSite = sitesTracked > 0 ? domainGroups[0].domain : '-';
+  const topSite = sitesTracked > 0 ? domainGroups.reduce((top, site) => site.totalCount > top.totalCount ? site : top).domain : '-';
 
   // Helper to format date/month for display
   const displayPeriod = date 
-    ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    ? formatPakistanDate(`${date}T00:00:00+05:00`, { month: 'short', day: 'numeric', year: 'numeric' })
     : month 
-      ? new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      ? formatPakistanDate(`${month}-01T00:00:00+05:00`, { month: 'short', year: 'numeric' })
       : 'Overall';
   const periodLabel = date ? 'on' : month ? 'in' : null;
 
   return (
     <div className="min-h-screen bg-[#18181b] p-6 md:p-10 font-sans text-gray-200">
       <div className="max-w-5xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
+          <p className="mt-2 text-sm text-gray-400">Browse articles by website and author. <Link href="/analytics" className="text-indigo-400 hover:text-indigo-300">View analytics →</Link></p>
+        </div>
         
         {/* Search Website Input */}
         <div className="w-full">
@@ -241,6 +242,7 @@ export default function Dashboard() {
         </div>
 
         {/* Loading State */}
+
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-8">
             {[1, 2, 3].map((i) => (
@@ -291,9 +293,17 @@ export default function Dashboard() {
                               {item.totalPrice.toLocaleString()}
                             </span>
                           )}
-                          <span className="inline-flex items-center justify-center bg-[#18181b] rounded-full px-2.5 py-0.5 text-[11px] font-bold text-gray-300">
+                          <Link
+                            href={`/dashboard/posts?${new URLSearchParams({
+                              domain,
+                              author: item.author,
+                              ...(date ? { date } : month ? { month } : {}),
+                            }).toString()}`}
+                            aria-label={`View ${item.count} posts by ${item.author} on ${domain}`}
+                            className="inline-flex items-center justify-center bg-[#18181b] hover:bg-[#3f3f46] focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-300 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-gray-300 transition-colors"
+                          >
                             {item.count}
-                          </span>
+                          </Link>
                         </div>
                      </div>
                   ))}

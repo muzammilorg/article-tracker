@@ -30,6 +30,10 @@ const SiteSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  admins: {
+    type: [String],
+    default: [],
+  },
   active: {
     type: Boolean,
     default: true,

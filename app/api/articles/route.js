@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '../../../lib/mongodb.js';
 import Article from '../../../models/Article.js';
-
 import Site from '../../../models/Site.js';
+import { getPakistanDateRange } from '../../../lib/date-time.js';
 
 export async function GET(request) {
   try {
@@ -15,25 +15,14 @@ export async function GET(request) {
     const domain = searchParams.get('domain');
 
     const matchStage = { deleted: { $ne: true } }; // Exclude posts deleted from WordPress
-
-    if (date) {
-      const startDate = new Date(`${date}T00:00:00Z`);
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + 1);
-      
-      matchStage.publishedAt = {
-        $gte: startDate,
-        $lt: endDate
-      };
-    } else if (month) {
-      const startDate = new Date(`${month}-01T00:00:00Z`);
-      const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + 1);
-      
-      matchStage.publishedAt = {
-        $gte: startDate,
-        $lt: endDate
-      };
+    let dateRange;
+    try {
+      dateRange = getPakistanDateRange({ date, month });
+    } catch (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+    if (dateRange) {
+      matchStage.publishedAt = { $gte: dateRange.startDate, $lt: dateRange.endDate };
     }
 
     if (author) {

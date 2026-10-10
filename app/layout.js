@@ -21,13 +21,14 @@ export default async function RootLayout({ children }) {
       <body className={`${inter.className} antialiased bg-[#18181b] text-gray-200`} suppressHydrationWarning>
         {!isLoginPage && (
           <nav className="bg-[#18181b] border-b border-[#3f3f46] sticky top-0 z-50">
-            <div className="max-w-5xl mx-auto px-6 md:px-10 py-4 flex items-center justify-between">
+            <div className="max-w-5xl mx-auto px-6 md:px-10 py-4 flex flex-wrap gap-4 items-center justify-between">
               <Link href="/dashboard" className="text-base font-bold text-white">
                 HG Agency Article Tracker
               </Link>
               <div className="flex items-center gap-6">
                 <div className="flex gap-6 font-medium text-sm text-gray-400">
                   <Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
+                  <Link href="/analytics" className="hover:text-white transition-colors">Analytics</Link>
                   <Link href="/sites" className="hover:text-white transition-colors">Manage Sites</Link>
                 </div>
                 <LogoutButton />

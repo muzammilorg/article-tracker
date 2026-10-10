@@ -72,6 +72,16 @@ function Field({ label, children }) {
 const inputCls = "w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-colors text-sm";
 const selectCls = "w-full appearance-none bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-colors text-sm cursor-pointer";
 
+function normalizeAdminAuthors(value) {
+  return [...new Map(
+    value
+      .split('\n')
+      .map(name => name.trim())
+      .filter(Boolean)
+      .map(name => [name.toLowerCase(), name])
+  ).values()];
+}
+
 // ── Badge ─────────────────────────────────────────────────────────
 function Badge({ children, color }) {
   const colors = {
@@ -84,6 +94,84 @@ function Badge({ children, color }) {
     <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${colors[color]}`}>
       {children}
     </span>
+  );
+}
+
+function AdminAuthorsForm({ site, onSave }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [adminAuthors, setAdminAuthors] = useState((site.admins || []).join('\n'));
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
+  const admins = site.admins || [];
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setError('');
+    const result = await onSave(site._id, normalizeAdminAuthors(adminAuthors));
+    setIsSaving(false);
+
+    if (result.success) {
+      setAdminAuthors(result.admins.join('\n'));
+      setIsEditing(false);
+    } else {
+      setError(result.error);
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t border-[#3f3f46] pt-3">
+      {isEditing ? (
+        <div className="space-y-2">
+          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+            Admin authors to exclude (one per line)
+          </label>
+          <textarea
+            value={adminAuthors}
+            onChange={e => setAdminAuthors(e.target.value)}
+            rows={3}
+            placeholder={'Site Admin\nEditor Name'}
+            className={inputCls}
+          />
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="px-3 py-1.5 bg-white hover:bg-gray-100 text-[#18181b] rounded-lg text-xs font-semibold disabled:opacity-50"
+            >
+              {isSaving ? 'Saving...' : 'Save Admins'}
+            </button>
+            <button
+              onClick={() => {
+                setAdminAuthors(admins.join('\n'));
+                setError('');
+                setIsEditing(false);
+              }}
+              disabled={isSaving}
+              className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] border border-[#3f3f46] rounded-lg text-xs font-semibold text-gray-300 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 text-xs text-gray-500 truncate">
+            <span className="text-gray-400">Excluded admins:</span>{' '}
+            {admins.length ? admins.join(', ') : 'None'}
+          </p>
+          <button
+            onClick={() => {
+              setAdminAuthors(admins.join('\n'));
+              setIsEditing(true);
+            }}
+            className="flex-shrink-0 px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] border border-[#3f3f46] rounded-lg text-xs font-semibold text-gray-300 transition-colors"
+          >
+            Edit Admins
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -162,6 +250,7 @@ export default function SitesAdmin() {
   const [customFavicon, setCustomFavicon] = useState('');
   const [basePrice, setBasePrice] = useState('');
   const [primeStarPrice, setPrimeStarPrice] = useState('');
+  const [adminAuthors, setAdminAuthors] = useState('');
 
   const fetchSites = async () => {
     try {
@@ -186,6 +275,7 @@ export default function SitesAdmin() {
         domain, type, customFavicon,
         basePrice: Number(basePrice) || 0,
         primeStarPrice: Number(primeStarPrice) || 0,
+        admins: normalizeAdminAuthors(adminAuthors),
         ...(type === 'rss'
           ? { rssUrl }
           : { scrapeConfig: { articleListUrl, articleLinkSelector, authorSelector } }),
@@ -199,6 +289,7 @@ export default function SitesAdmin() {
       if (json.success) {
         setDomain(''); setRssUrl(''); setArticleListUrl(''); setCustomFavicon('');
         setBasePrice(''); setPrimeStarPrice('');
+        setAdminAuthors('');
         setSubmitStatus({ type: 'success', message: 'Website added successfully!' });
         fetchSites();
         setTimeout(() => setSubmitStatus(null), 3000);
@@ -272,6 +363,28 @@ export default function SitesAdmin() {
       });
       fetchSites();
     } catch (e) { console.error('Failed to update prices', e); }
+  };
+
+  const handleSaveAdmins = async (siteId, admins) => {
+    try {
+      const res = await fetch(`/api/sites/${siteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admins }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        return { success: false, error: json.error || 'Failed to update admin authors.' };
+      }
+
+      setSites(currentSites => currentSites.map(site => (
+        site._id === siteId ? json.data : site
+      )));
+      return { success: true, admins: json.data.admins || [] };
+    } catch (error) {
+      console.error('Failed to update admin authors', error);
+      return { success: false, error: 'Network error. Please try again.' };
+    }
   };
 
   const handleSync = async () => {
@@ -395,6 +508,16 @@ export default function SitesAdmin() {
               </Field>
             </div>
 
+            <Field label="Admin Authors to Exclude (one per line)">
+              <textarea
+                value={adminAuthors}
+                onChange={(e) => setAdminAuthors(e.target.value)}
+                placeholder={"e.g.\nSite Admin\nEditor Name"}
+                rows={3}
+                className={inputCls}
+              />
+            </Field>
+
             <Field label="Custom Favicon (Optional)">
               <FaviconUpload value={customFavicon} onChange={setCustomFavicon} />
             </Field>
@@ -483,7 +606,8 @@ export default function SitesAdmin() {
           ) : (
             <div className="space-y-3">
               {sites.map(site => (
-                <div key={site._id} className="flex items-center gap-4 p-4 bg-[#18181b] rounded-xl border border-[#3f3f46] hover:border-gray-600 transition-colors">
+                <div key={site._id} className="p-4 bg-[#18181b] rounded-xl border border-[#3f3f46] hover:border-gray-600 transition-colors">
+                  <div className="flex items-center gap-4">
 
                   {/* Favicon */}
                   <div className="flex-shrink-0">
@@ -561,6 +685,8 @@ export default function SitesAdmin() {
                       )}
                     </button>
                   </div>
+                  </div>
+                  <AdminAuthorsForm site={site} onSave={handleSaveAdmins} />
                 </div>
               ))}
             </div>
