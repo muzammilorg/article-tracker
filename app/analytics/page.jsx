@@ -5,7 +5,6 @@ import Analytics from '../dashboard/Analytics.jsx';
 
 export default function AnalyticsPage() {
   const [data, setData] = useState([]);
-  const [sites, setSites] = useState([]);
   const [month, setMonth] = useState('');
   const [domain, setDomain] = useState('');
   const [author, setAuthor] = useState('');
@@ -27,7 +26,6 @@ export default function AnalyticsPage() {
         const [articles, config] = await Promise.all(responses.map(response => response.json()));
         if (responses.some(response => !response.ok) || !articles.success || !config.success) throw new Error('Unable to load analytics. Please try again.');
         setData(articles.data);
-        setSites(config.data);
       } catch (err) {
         if (!controller.signal.aborted) setError(err.message);
       } finally {
@@ -42,20 +40,15 @@ export default function AnalyticsPage() {
     const grouped = new Map();
     for (const item of data) {
       if (domain && item.domain !== domain || author && item.author !== author) continue;
-      const site = sites.find(site => site.domain.toLowerCase() === item.domain.toLowerCase());
-      const name = item.author?.trim().toLowerCase();
-      const isAdmin = !name || site?.admins?.some(admin => admin.trim().toLowerCase() === name);
-      const isPrime = name === 'prime star' || name === 'prime star seo';
-      const pricePerPost = isAdmin ? 0 : isPrime && site?.primeStarPrice > 0 ? site.primeStarPrice : site?.basePrice > 0 ? site.basePrice : 0;
       const group = grouped.get(item.domain) || { domain: item.domain, items: [], totalCount: 0, totalAmount: 0 };
-      const totalPrice = pricePerPost * item.count;
-      group.items.push({ ...item, pricePerPost, totalPrice });
+      const totalPrice = item.totalPrice || 0;
+      group.items.push({ ...item, totalPrice });
       group.totalCount += item.count;
       group.totalAmount += totalPrice;
       grouped.set(item.domain, group);
     }
     return [...grouped.values()];
-  }, [data, sites, domain, author]);
+  }, [data, domain, author]);
   const inputClass = 'mt-2 w-full rounded-lg border border-[#3f3f46] bg-[#27272a] px-3 py-3 text-sm text-white [color-scheme:dark]';
 
   return <main className="min-h-screen bg-[#18181b] px-6 py-8 md:p-10">

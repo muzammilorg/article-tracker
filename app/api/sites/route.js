@@ -16,7 +16,8 @@ export async function POST(request) {
   try {
     await dbConnect();
     const body = await request.json();
-    const site = await Site.create(body);
+    const { priceHistory, effectiveFrom, ...settings } = body;
+    const site = await Site.create(settings);
     return NextResponse.json({ success: true, data: site }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });

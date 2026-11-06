@@ -13,7 +13,6 @@ export default function Dashboard() {
   const [siteSearch, setSiteSearch] = useState('');
   const [sortOrder, setSortOrder] = useState('most');
   const [allAuthors, setAllAuthors] = useState([]);
-  const [sitesConfig, setSitesConfig] = useState([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -54,20 +53,7 @@ export default function Dashboard() {
       }
     };
 
-    const fetchSites = async () => {
-      try {
-        const res = await fetch('/api/sites');
-        const json = await res.json();
-        if (json.success) {
-          setSitesConfig(json.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch sites configuration', error);
-      }
-    };
-
     fetchAuthors();
-    fetchSites();
   }, []);
 
   useEffect(() => {
@@ -77,24 +63,6 @@ export default function Dashboard() {
     }, 500);
     return () => clearTimeout(timer);
   }, [month, date, authorSearch]);
-
-  const getPricePerPost = (domain, author) => {
-    const site = sitesConfig.find(s => s.domain.toLowerCase() === domain.toLowerCase());
-    const normalizedAuthor = author?.trim().toLowerCase();
-
-    if (!normalizedAuthor || site?.admins?.some(name => name.trim().toLowerCase() === normalizedAuthor)) {
-      return 0;
-    }
-
-    const isPrimeStar = normalizedAuthor === 'prime star' || normalizedAuthor === 'prime star seo';
-    
-    if (site) {
-      if (isPrimeStar && site.primeStarPrice > 0) return site.primeStarPrice;
-      if (site.basePrice > 0) return site.basePrice;
-    }
-    
-    return 0;
-  };
 
   const filteredData = useMemo(() => {
     if (!siteSearch) return data;
@@ -115,8 +83,7 @@ export default function Dashboard() {
       const totalCount = items.reduce((sum, item) => sum + item.count, 0);
       
       const itemsWithPrice = items.map(item => {
-        const pricePerPost = getPricePerPost(item.domain, item.author);
-        return { ...item, pricePerPost, totalPrice: pricePerPost * item.count };
+        return item;
       });
       
       const totalAmount = itemsWithPrice.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -131,7 +98,7 @@ export default function Dashboard() {
     }
 
     return sorted;
-  }, [filteredData, sortOrder, sitesConfig]);
+  }, [filteredData, sortOrder]);
 
   const totalGlobalPosts = domainGroups.reduce((sum, site) => sum + site.totalCount, 0);
   const totalGlobalAmount = domainGroups.reduce((sum, site) => sum + site.totalAmount, 0);

@@ -1,0 +1,20 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { addPriceChange, priceAt } from '../lib/pricing.js';
+test('rate changes preserve history at Pakistan midnight and allow historical corrections', () => {
+ const site = {basePrice:1000, primeStarPrice:800, admins:['Admin']};
+ Object.assign(site, addPriceChange(site,{basePrice:2500,primeStarPrice:2000,effectiveFrom:'2026-01-10'}));
+ assert.equal(priceAt(site,'Writer','2026-01-09T18:59:59Z'),1000);
+ assert.equal(priceAt(site,'Writer','2026-01-09T19:00:00Z'),2500);
+ assert.equal(priceAt(site,'Prime Star SEO','2026-01-10'),2000);
+ assert.equal(priceAt(site,'Admin','2026-01-10'),0);
+ Object.assign(site, addPriceChange(site,{basePrice:1200,primeStarPrice:0,effectiveFrom:'2025-06-01'}));
+ assert.equal(priceAt(site,'Prime Star','2025-07-01'),1200);
+ assert.equal(priceAt(site,'Writer','2026-01-10'),2500);
+ Object.assign(site, addPriceChange(site,{basePrice:1300,primeStarPrice:900,effectiveFrom:'2025-06-01'}));
+ assert.equal(site.priceHistory.length,3);
+ assert.equal(priceAt(site,'Writer','2025-07-01'),1300);
+ assert.equal(priceAt(site,'Writer','2025-07-01')+priceAt(site,'Writer','2026-01-10'),3800);
+ for (const value of [-1,null,'',Infinity]) assert.throws(()=>addPriceChange(site,{basePrice:value}));
+ assert.throws(()=>addPriceChange(site,{effectiveFrom:'2026-02-30',basePrice:1}));
+});

@@ -61,7 +61,7 @@ export default function Analytics({ groups, period }) {
       current.count += item.count;
       current.amount += item.totalPrice;
       authors.set(name, current);
-      if (item.pricePerPost > 0) pricedPosts += item.count;
+      pricedPosts += item.pricedCount || 0;
     }
   }
   const posts = groups.reduce((sum, site) => sum + site.totalCount, 0);
@@ -90,7 +90,7 @@ export default function Analytics({ groups, period }) {
         <Ranking title="Leading authors" rows={contributors} total={total} metric={label} />
       </div>
       <Distribution rows={sites} total={total} metric={label} />
-      <p className="text-xs leading-relaxed text-gray-500">Estimated value uses current site prices and excludes configured admins and articles without a price. Amounts use the units entered in site settings.</p>
+      <p className="text-xs leading-relaxed text-gray-500">Estimated value uses site prices effective on each article publication date and excludes configured admins and articles without a price. Amounts use the units entered in site settings.</p>
     </div>
   );
 }

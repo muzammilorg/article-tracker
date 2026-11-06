@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { pakistanToday } from '../../lib/pricing.js';
 
 // ── Favicon Upload Zone ──────────────────────────────────────────
 function FaviconUpload({ value, onChange, compact = false }) {
@@ -189,46 +190,29 @@ function Spinner({ className = 'w-4 h-4' }) {
 function PricingForm({ site, onSave }) {
   const [basePrice, setBasePrice] = useState(site.basePrice || 0);
   const [primeStarPrice, setPrimeStarPrice] = useState(site.primeStarPrice || 0);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    await onSave(site._id, basePrice, primeStarPrice);
-    setIsSaving(false);
+  const [effectiveFrom, setEffectiveFrom] = useState(pakistanToday());
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const handleSave = async (e) => {
+    e.preventDefault(); setSaving(true); setMessage('');
+    const result = await onSave(site._id, basePrice, primeStarPrice, effectiveFrom);
+    setSaving(false); setMessage(result.success ? 'Price history saved.' : result.error);
   };
-
-  return (
-    <div className="hidden md:flex items-end gap-3 border-l border-[#3f3f46] pl-6 py-1">
-      <div className="flex flex-col gap-1">
-        <span className="text-[10px] text-gray-500 uppercase font-semibold">Base Price</span>
-        <input 
-          type="number" 
-          className="w-20 bg-[#18181b] border border-[#3f3f46] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-gray-400 transition-colors"
-          value={basePrice}
-          onChange={e => setBasePrice(e.target.value)}
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-[10px] text-gray-500 uppercase font-semibold">Prime Star</span>
-        <input 
-          type="number" 
-          className="w-20 bg-[#18181b] border border-[#3f3f46] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-gray-400 transition-colors"
-          value={primeStarPrice}
-          onChange={e => setPrimeStarPrice(e.target.value)}
-        />
-      </div>
-      <button 
-        onClick={handleSave}
-        disabled={isSaving}
-        className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] border border-[#3f3f46] rounded-lg text-xs font-semibold text-gray-300 transition-colors disabled:opacity-50"
-      >
-        {isSaving ? 'Saving...' : 'Save'}
-      </button>
-    </div>
-  );
+  return <div className="mt-3 border-t border-[#3f3f46] pt-3">
+    <form onSubmit={handleSave} className="flex flex-wrap items-end gap-3">
+      <label className="text-xs text-gray-400">Base Price<input aria-label="Base Price" type="number" min="0" step="any" required value={basePrice} onChange={e=>setBasePrice(e.target.value)} className={inputCls} /></label>
+      <label className="text-xs text-gray-400">Prime Star<input aria-label="Prime Star Price" type="number" min="0" step="any" required value={primeStarPrice} onChange={e=>setPrimeStarPrice(e.target.value)} className={inputCls} /></label>
+      <label className="text-xs text-gray-400">Effective from<input type="date" required max={pakistanToday()} value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)} className={inputCls + ' [color-scheme:dark]'} /></label>
+      <button disabled={saving} className="px-3 py-2 bg-[#27272a] rounded-lg text-xs disabled:opacity-50">{saving ? 'Saving...' : 'Save Price'}</button>
+    </form>
+    <p className="mt-2 text-xs text-gray-400">Rates apply from the selected date (Pakistan time). Earlier articles keep their previous rate. Saving the same date corrects that entry.</p>
+    {message && <p role="status" className="mt-2 text-xs text-gray-300">{message}</p>}
+    <details className="mt-2 text-xs text-gray-400"><summary className="cursor-pointer">Price history</summary>
+      <ul className="mt-2 space-y-1">{(site.priceHistory?.length ? [...site.priceHistory].sort((a,b)=>new Date(a.effectiveFrom)-new Date(b.effectiveFrom)) : [{effectiveFrom: new Date(0).toISOString(), basePrice: site.basePrice || 0, primeStarPrice: site.primeStarPrice || 0}]).map(rate=><li key={rate.effectiveFrom}>{new Date(rate.effectiveFrom).getTime() === 0 ? 'Earlier articles' : new Date(new Date(rate.effectiveFrom).getTime()+18000000).toISOString().slice(0,10)}: Base {rate.basePrice} / Prime Star {rate.primeStarPrice}</li>)}</ul>
+    </details>
+  </div>;
 }
 
-// ── Main Page ─────────────────────────────────────────────────────
 export default function SitesAdmin() {
   const [sites, setSites] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -351,18 +335,14 @@ export default function SitesAdmin() {
     } catch (e) { console.error(e); }
   };
 
-  const handleSavePrices = async (siteId, basePrice, primeStarPrice) => {
+  const handleSavePrices = async (siteId, basePrice, primeStarPrice, effectiveFrom) => {
     try {
-      await fetch(`/api/sites/${siteId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          basePrice: Number(basePrice) || 0,
-          primeStarPrice: Number(primeStarPrice) || 0 
-        }),
-      });
-      fetchSites();
-    } catch (e) { console.error('Failed to update prices', e); }
+      const res = await fetch('/api/sites/' + siteId, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({basePrice: Number(basePrice), primeStarPrice: Number(primeStarPrice), effectiveFrom})});
+      const json = await res.json();
+      if (!res.ok || !json.success) return {success: false, error: json.error || 'Unable to save prices.'};
+      setSites(current => current.map(site => site._id === siteId ? json.data : site));
+      return {success: true};
+    } catch { return {success: false, error: 'Network error. Please try again.'}; }
   };
 
   const handleSaveAdmins = async (siteId, admins) => {
@@ -640,7 +620,7 @@ export default function SitesAdmin() {
                     </div>
 
                     {/* Pricing Inputs */}
-                    <PricingForm site={site} onSave={handleSavePrices} />
+
                   </div>
 
                   {/* Actions */}
@@ -686,6 +666,7 @@ export default function SitesAdmin() {
                     </button>
                   </div>
                   </div>
+                  <PricingForm site={site} onSave={handleSavePrices} />
                   <AdminAuthorsForm site={site} onSave={handleSaveAdmins} />
                 </div>
               ))}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/mongodb.js';
 import Site from '../../../../models/Site.js';
+import { addPriceChange } from '../../../../lib/pricing.js';
 
 export async function PATCH(request, { params }) {
   try {
@@ -8,15 +9,13 @@ export async function PATCH(request, { params }) {
     const { id } = await params;
     const body = await request.json();
     
-    const site = await Site.findByIdAndUpdate(id, body, {
-      new: true,
-      runValidators: true,
-    });
-    
-    if (!site) {
-      return NextResponse.json({ success: false, error: 'Site not found' }, { status: 404 });
+    const site = await Site.findById(id);
+    if (!site) return NextResponse.json({success: false, error: 'Site not found'}, {status: 404});
+    for (const key of ['domain','type','rssUrl','scrapeConfig','customFavicon','admins','active']) {
+      if (body[key] !== undefined) site.set(key, body[key]);
     }
-    
+    if (body.basePrice !== undefined || body.primeStarPrice !== undefined) Object.assign(site, addPriceChange(site, body));
+    await site.save();
     return NextResponse.json({ success: true, data: site });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });

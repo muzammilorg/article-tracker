@@ -30,6 +30,13 @@ const SiteSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  priceHistory: {
+    type: [new mongoose.Schema({
+      effectiveFrom: { type: Date, required: true },
+      basePrice: { type: Number, required: true, min: 0 },
+      primeStarPrice: { type: Number, required: true, min: 0 },
+    }, { _id: false })], default: [],
+  },
   admins: {
     type: [String],
     default: [],
@@ -38,6 +45,6 @@ const SiteSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-}, { timestamps: true });
+}, { timestamps: true, optimisticConcurrency: true });
 
 export default mongoose.models.Site || mongoose.model('Site', SiteSchema);
