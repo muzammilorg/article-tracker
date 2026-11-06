@@ -4,7 +4,6 @@ import dbConnect from '../../../lib/mongodb.js';
 import Site from '../../../models/Site.js';
 import { collectRss } from '../../../lib/collectors/rss.js';
 import { collectScrape } from '../../../lib/collectors/scraper.js';
-import Article from '../../../models/Article.js';
 
 export async function POST(request) {
   // Auth: must be logged in as admin
@@ -24,33 +23,29 @@ export async function POST(request) {
     // Run each site and track counts
     const results = await Promise.allSettled(
       sites.map(async (site) => {
-        // Count articles before sync
-        const before = await Article.countDocuments({ domain: site.domain, deleted: { $ne: true } });
-
+        let collected;
         if (site.type === 'rss') {
-          await collectRss(site);
+          collected = await collectRss(site);
         } else if (site.type === 'scrape') {
-          await collectScrape(site);
+          collected = await collectScrape(site);
         }
-
-        // Count after sync
-        const after = await Article.countDocuments({ domain: site.domain, deleted: { $ne: true } });
-        const newArticles = after - before;
+        const newArticles = collected?.newArticles || 0;
 
         return { domain: site.domain, newArticles, type: site.type };
       })
     );
 
-    const summary = results.map((r) => {
+    const summary = results.map((r, index) => {
       if (r.status === 'fulfilled') return r.value;
-      return { domain: '?', newArticles: 0, error: r.reason?.message || 'Failed' };
+      return { domain: sites[index].domain, newArticles: 0, error: r.reason?.message || 'Failed' };
     });
 
     const totalNew = summary.reduce((sum, s) => sum + (s.newArticles || 0), 0);
+    const failedSites = summary.filter(item => item.error).length;
 
     return NextResponse.json({
       success: true,
-      message: `Sync complete. ${totalNew} new article${totalNew !== 1 ? 's' : ''} found across ${sites.length} site${sites.length !== 1 ? 's' : ''}.`,
+      message: `Sync ${failedSites ? 'finished with ' + failedSites + ' site errors' : 'complete'}. ${totalNew} new article${totalNew !== 1 ? 's' : ''} found across ${sites.length} site${sites.length !== 1 ? 's' : ''}.`,
       totalNew,
       results: summary,
     });

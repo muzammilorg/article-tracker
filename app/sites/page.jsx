@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { pakistanToday } from '../../lib/pricing.js';
+import ReconcileSite from './ReconcileSite.jsx';
 
 // ── Favicon Upload Zone ──────────────────────────────────────────
 function FaviconUpload({ value, onChange, compact = false }) {
@@ -668,6 +669,7 @@ export default function SitesAdmin() {
                   </div>
                   <PricingForm site={site} onSave={handleSavePrices} />
                   <AdminAuthorsForm site={site} onSave={handleSaveAdmins} />
+                  <ReconcileSite site={site} />
                 </div>
               ))}
             </div>
