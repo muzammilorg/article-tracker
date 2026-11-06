@@ -26,8 +26,9 @@ export default async function RootLayout({ children }) {
                 HG Agency Article Tracker
               </Link>
               <div className="flex items-center gap-6">
-                <div className="flex gap-6 font-medium text-sm text-gray-400">
+                <div className="flex flex-wrap gap-6 font-medium text-sm text-gray-400">
                   <Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
+                  <Link href="/bills" className="hover:text-white transition-colors">Author Bills</Link>
                   <Link href="/analytics" className="hover:text-white transition-colors">Analytics</Link>
                   <Link href="/sites" className="hover:text-white transition-colors">Manage Sites</Link>
                 </div>
